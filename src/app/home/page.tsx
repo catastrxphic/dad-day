@@ -5,99 +5,7 @@ import { motion } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 
 const words = ['DAD', 'BEST', 'KUALAMANA', 'WII', 'PEDOBIJA', 'ROSA', 'CALDO', 'LOVEYOU'];
-const GRID_SIZE = 15;
-
-function generateGrid() {
-  const grid = Array(GRID_SIZE).fill(null).map(() => Array(GRID_SIZE).fill(''));
-  const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-  const placedWords: string[] = [];
-  
-  // Sort words by length (longest first) to optimize placement
-  const sortedWords = [...words].sort((a, b) => b.length - a.length);
-  
-  // Place words in the grid
-  sortedWords.forEach(word => {
-    let placed = false;
-    let attempts = 0;
-    const maxAttempts = 200; // Increased attempts
-
-    while (!placed && attempts < maxAttempts) {
-      const direction = Math.random() < 0.5 ? 'horizontal' : 'vertical';
-      const row = Math.floor(Math.random() * GRID_SIZE);
-      const col = Math.floor(Math.random() * GRID_SIZE);
-
-      if (canPlaceWord(grid, word, row, col, direction)) {
-        placeWord(grid, word, row, col, direction);
-        placed = true;
-        placedWords.push(word);
-      }
-      attempts++;
-    }
-
-    if (!placed) {
-      console.warn(`Failed to place word: ${word}`);
-    }
-  });
-
-  // Verify all words are placed
-  const missingWords = words.filter(word => !placedWords.includes(word));
-  if (missingWords.length > 0) {
-    console.error('Missing words:', missingWords);
-    // If any words are missing, regenerate the grid
-    return generateGrid();
-  }
-
-  // Fill remaining spaces with random letters
-  for (let i = 0; i < GRID_SIZE; i++) {
-    for (let j = 0; j < GRID_SIZE; j++) {
-      if (grid[i][j] === '') {
-        grid[i][j] = letters[Math.floor(Math.random() * letters.length)];
-      }
-    }
-  }
-
-  return grid;
-}
-
-function canPlaceWord(grid: string[][], word: string, row: number, col: number, direction: 'horizontal' | 'vertical'): boolean {
-  // Check if word fits within grid bounds
-  if (direction === 'horizontal' && col + word.length > GRID_SIZE) return false;
-  if (direction === 'vertical' && row + word.length > GRID_SIZE) return false;
-
-  // Check if space is available and doesn't conflict with existing letters
-  for (let i = 0; i < word.length; i++) {
-    const currentRow = direction === 'horizontal' ? row : row + i;
-    const currentCol = direction === 'horizontal' ? col + i : col;
-    
-    // Check if the cell is empty or contains the same letter
-    if (grid[currentRow][currentCol] !== '' && grid[currentRow][currentCol] !== word[i]) {
-      return false;
-    }
-
-    // For horizontal words, check cells above and below
-    if (direction === 'horizontal') {
-      if (row > 0 && grid[row - 1][currentCol] !== '') return false;
-      if (row < GRID_SIZE - 1 && grid[row + 1][currentCol] !== '') return false;
-    }
-    // For vertical words, check cells to the left and right
-    else {
-      if (col > 0 && grid[currentRow][col - 1] !== '') return false;
-      if (col < GRID_SIZE - 1 && grid[currentRow][col + 1] !== '') return false;
-    }
-  }
-
-  return true;
-}
-
-function placeWord(grid: string[][], word: string, row: number, col: number, direction: 'horizontal' | 'vertical') {
-  for (let i = 0; i < word.length; i++) {
-    if (direction === 'horizontal') {
-      grid[row][col + i] = word[i];
-    } else {
-      grid[row + i][col] = word[i];
-    }
-  }
-}
+const gridSize = 15;
 
 export default function HomePage() {
   const router = useRouter();
@@ -105,81 +13,168 @@ export default function HomePage() {
   const [selectedCells, setSelectedCells] = useState<[number, number][]>([]);
   const [foundWords, setFoundWords] = useState<string[]>([]);
   const [isClient, setIsClient] = useState(false);
+  const [isSelecting, setIsSelecting] = useState(false);
 
   useEffect(() => {
     setIsClient(true);
-    setGrid(generateGrid());
+    generateGrid();
   }, []);
 
-  const handleMouseDown = (row: number, col: number) => {
+  const generateGrid = () => {
+    // Initialize empty grid
+    const newGrid: string[][] = Array(gridSize).fill(null).map(() => Array(gridSize).fill(''));
+    const placedWords: string[] = [];
+
+    // Sort words by length (longest first) to optimize placement
+    const sortedWords = [...words].sort((a, b) => b.length - a.length);
+
+    // Try to place each word
+    sortedWords.forEach(word => {
+      let placed = false;
+      let attempts = 0;
+      const maxAttempts = 200; // Increased attempts for better placement
+
+      while (!placed && attempts < maxAttempts) {
+        const direction = Math.random() < 0.5 ? 'horizontal' : 'vertical';
+        const row = Math.floor(Math.random() * gridSize);
+        const col = Math.floor(Math.random() * gridSize);
+
+        if (canPlaceWord(word, row, col, direction, newGrid)) {
+          placeWord(word, row, col, direction, newGrid);
+          placed = true;
+          placedWords.push(word);
+        }
+        attempts++;
+      }
+
+      if (!placed) {
+        console.warn(`Could not place word: ${word}`);
+      }
+    });
+
+    // Fill remaining spaces with random letters
+    for (let i = 0; i < gridSize; i++) {
+      for (let j = 0; j < gridSize; j++) {
+        if (newGrid[i][j] === '') {
+          newGrid[i][j] = String.fromCharCode(65 + Math.floor(Math.random() * 26));
+        }
+      }
+    }
+
+    setGrid(newGrid);
+  };
+
+  const canPlaceWord = (word: string, row: number, col: number, direction: 'horizontal' | 'vertical', grid: string[][]): boolean => {
+    if (direction === 'horizontal') {
+      if (col + word.length > gridSize) return false;
+      for (let i = 0; i < word.length; i++) {
+        // Check if cell is empty or contains the same letter
+        if (grid[row][col + i] !== '' && grid[row][col + i] !== word[i]) return false;
+        // Check for letters above and below
+        if (row > 0 && grid[row - 1][col + i] !== '') return false;
+        if (row < gridSize - 1 && grid[row + 1][col + i] !== '') return false;
+      }
+      // Check for letters at the ends
+      if (col > 0 && grid[row][col - 1] !== '') return false;
+      if (col + word.length < gridSize && grid[row][col + word.length] !== '') return false;
+    } else {
+      if (row + word.length > gridSize) return false;
+      for (let i = 0; i < word.length; i++) {
+        if (grid[row + i][col] !== '' && grid[row + i][col] !== word[i]) return false;
+        // Check for letters to the left and right
+        if (col > 0 && grid[row + i][col - 1] !== '') return false;
+        if (col < gridSize - 1 && grid[row + i][col + 1] !== '') return false;
+      }
+      // Check for letters at the ends
+      if (row > 0 && grid[row - 1][col] !== '') return false;
+      if (row + word.length < gridSize && grid[row + word.length][col] !== '') return false;
+    }
+    return true;
+  };
+
+  const placeWord = (word: string, row: number, col: number, direction: 'horizontal' | 'vertical', grid: string[][]) => {
+    for (let i = 0; i < word.length; i++) {
+      if (direction === 'horizontal') {
+        grid[row][col + i] = word[i];
+      } else {
+        grid[row + i][col] = word[i];
+      }
+    }
+  };
+
+  const handleTouchStart = (row: number, col: number) => {
+    setIsSelecting(true);
     setSelectedCells([[row, col]]);
   };
 
-  const handleMouseEnter = (row: number, col: number) => {
-    if (selectedCells.length === 0) return;
-
-    const [startRow, startCol] = selectedCells[0];
-    const newSelectedCells: [number, number][] = [[startRow, startCol]];
+  const handleTouchMove = (row: number, col: number) => {
+    if (!isSelecting) return;
     
-    const rowDiff = row - startRow;
-    const colDiff = col - startCol;
+    const lastCell = selectedCells[selectedCells.length - 1];
+    if (!lastCell) return;
 
-    // Handle diagonal selection
-    if (Math.abs(rowDiff) === Math.abs(colDiff)) {
-      const steps = Math.abs(rowDiff);
-      const rowStep = rowDiff / steps;
-      const colStep = colDiff / steps;
-      
-      for (let i = 1; i <= steps; i++) {
-        const newRow = startRow + (i * rowStep);
-        const newCol = startCol + (i * colStep);
-        if (newRow >= 0 && newRow < GRID_SIZE && newCol >= 0 && newCol < GRID_SIZE) {
-          newSelectedCells.push([newRow, newCol]);
-        }
-      }
-    }
-    // Handle vertical selection
-    else if (colDiff === 0) {
-      const steps = Math.abs(rowDiff);
-      const step = rowDiff / steps;
-      for (let i = 1; i <= steps; i++) {
-        const newRow = startRow + (i * step);
-        if (newRow >= 0 && newRow < GRID_SIZE) {
-          newSelectedCells.push([newRow, startCol]);
-        }
-      }
-    }
-    // Handle horizontal selection
-    else if (rowDiff === 0) {
-      const steps = Math.abs(colDiff);
-      const step = colDiff / steps;
-      for (let i = 1; i <= steps; i++) {
-        const newCol = startCol + (i * step);
-        if (newCol >= 0 && newCol < GRID_SIZE) {
-          newSelectedCells.push([startRow, newCol]);
-        }
-      }
-    }
+    const [lastRow, lastCol] = lastCell;
+    const rowDiff = Math.abs(row - lastRow);
+    const colDiff = Math.abs(col - lastCol);
 
-    setSelectedCells(newSelectedCells);
+    // Only add cell if it's adjacent to the last selected cell
+    if ((rowDiff === 1 && colDiff === 0) || (rowDiff === 0 && colDiff === 1) || (rowDiff === 1 && colDiff === 1)) {
+      if (!selectedCells.some(([r, c]) => r === row && c === col)) {
+        setSelectedCells(prev => [...prev, [row, col]]);
+      }
+    }
   };
 
-  const handleMouseUp = () => {
+  const handleTouchEnd = () => {
+    setIsSelecting(false);
     if (selectedCells.length > 0) {
-      const selectedWord = selectedCells
-        .map(([row, col]) => grid[row][col])
-        .join('');
-      
-      const reversedWord = selectedWord.split('').reverse().join('');
-      
-      if (words.includes(selectedWord) && !foundWords.includes(selectedWord)) {
-        setFoundWords([...foundWords, selectedWord]);
-      } else if (words.includes(reversedWord) && !foundWords.includes(reversedWord)) {
-        setFoundWords([...foundWords, reversedWord]);
-      }
-      
-      setSelectedCells([]);
+      checkWord();
     }
+  };
+
+  const checkWord = () => {
+    const selectedWord = selectedCells
+      .map(([row, col]) => grid[row][col])
+      .join('');
+
+    const reverseWord = selectedWord.split('').reverse().join('');
+
+    if (words.includes(selectedWord) && !foundWords.includes(selectedWord)) {
+      setFoundWords(prev => [...prev, selectedWord]);
+    } else if (words.includes(reverseWord) && !foundWords.includes(reverseWord)) {
+      setFoundWords(prev => [...prev, reverseWord]);
+    }
+
+    setSelectedCells([]);
+  };
+
+  const findWordCells = (word: string): [number, number][] => {
+    const cells: [number, number][] = [];
+    for (let i = 0; i < gridSize; i++) {
+      for (let j = 0; j < gridSize; j++) {
+        // Check horizontal
+        if (j + word.length <= gridSize) {
+          const horizontalWord = grid[i].slice(j, j + word.length).join('');
+          if (horizontalWord === word) {
+            for (let k = 0; k < word.length; k++) {
+              cells.push([i, j + k]);
+            }
+            return cells;
+          }
+        }
+        // Check vertical
+        if (i + word.length <= gridSize) {
+          const verticalWord = Array.from({ length: word.length }, (_, k) => grid[i + k][j]).join('');
+          if (verticalWord === word) {
+            for (let k = 0; k < word.length; k++) {
+              cells.push([i + k, j]);
+            }
+            return cells;
+          }
+        }
+      }
+    }
+    return cells;
   };
 
   if (!isClient) {
@@ -193,7 +188,7 @@ export default function HomePage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-blue-500 to-purple-600 p-8">
+    <div className="min-h-screen bg-gradient-to-b from-blue-500 to-purple-600 p-4">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -203,20 +198,40 @@ export default function HomePage() {
         
         <div className="bg-white/10 backdrop-blur-lg rounded-lg p-6 mb-8">
           <div className="flex justify-center mb-8">
-            <div className="grid gap-1" style={{ 
-              gridTemplateColumns: `repeat(${GRID_SIZE}, minmax(0, 1fr))`,
-              width: 'fit-content'
-            }}>
+            <div 
+              className="grid gap-0.5 select-none touch-none"
+              style={{ 
+                gridTemplateColumns: `repeat(${gridSize}, minmax(0, 1fr))`,
+                width: 'fit-content',
+                maxWidth: '100%',
+                overflow: 'hidden'
+              }}
+            >
               {grid.map((row, rowIndex) => (
                 row.map((cell, colIndex) => (
                   <div
                     key={`${rowIndex},${colIndex}`}
-                    className={`w-10 h-10 flex items-center justify-center text-white font-bold cursor-pointer
+                    className={`w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center text-white font-bold
                       ${selectedCells.some(([r, c]) => r === rowIndex && c === colIndex) ? 'bg-yellow-500' : 'bg-blue-600/50'}
+                      ${foundWords.some(word => {
+                        const wordCells = findWordCells(word);
+                        return wordCells.some(([r, c]: [number, number]) => r === rowIndex && c === colIndex);
+                      }) ? 'bg-green-500' : ''}
                       hover:bg-blue-400/50 transition-colors`}
-                    onMouseDown={() => handleMouseDown(rowIndex, colIndex)}
-                    onMouseEnter={() => handleMouseEnter(rowIndex, colIndex)}
-                    onMouseUp={handleMouseUp}
+                    onTouchStart={() => handleTouchStart(rowIndex, colIndex)}
+                    onTouchMove={(e) => {
+                      e.preventDefault();
+                      const touch = e.touches[0];
+                      const element = document.elementFromPoint(touch.clientX, touch.clientY);
+                      if (element) {
+                        const [r, c] = element.getAttribute('data-coords')?.split(',').map(Number) || [];
+                        if (r !== undefined && c !== undefined) {
+                          handleTouchMove(r, c);
+                        }
+                      }
+                    }}
+                    onTouchEnd={handleTouchEnd}
+                    data-coords={`${rowIndex},${colIndex}`}
                   >
                     {cell}
                   </div>
@@ -225,29 +240,27 @@ export default function HomePage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-8">
+          <div className="grid grid-cols-2 gap-4">
             <div>
-              <h2 className="text-2xl font-bold text-white mb-4">Words to Find:</h2>
-              <div className="space-y-2">
-                {words.map((word, index) => (
-                  <p
+              <h2 className="text-xl font-bold text-white mb-2">Words to Find:</h2>
+              <ul className="text-white">
+                {words.map((word) => (
+                  <li
                     key={word}
-                    className={`text-white ${foundWords.includes(word) ? 'line-through opacity-50' : ''}`}
+                    className={`${foundWords.includes(word) ? 'line-through text-gray-400' : ''}`}
                   >
-                    {index + 1}. {word}
-                  </p>
+                    {word}
+                  </li>
                 ))}
-              </div>
+              </ul>
             </div>
             <div>
-              <h2 className="text-2xl font-bold text-white mb-4">Found Words:</h2>
-              <div className="space-y-2">
-                {foundWords.map((word, index) => (
-                  <p key={word} className="text-white">
-                    {index + 1}. {word}
-                  </p>
+              <h2 className="text-xl font-bold text-white mb-2">Found Words:</h2>
+              <ul className="text-white">
+                {foundWords.map((word) => (
+                  <li key={word}>{word}</li>
                 ))}
-              </div>
+              </ul>
             </div>
           </div>
 
@@ -259,9 +272,9 @@ export default function HomePage() {
             >
               <button
                 onClick={() => router.push('/crossword')}
-                className="bg-yellow-500 text-white px-6 py-3 rounded-lg font-bold hover:bg-yellow-600 transition-colors"
+                className="bg-white text-blue-600 px-6 py-3 rounded-lg font-bold hover:bg-blue-100 transition-colors"
               >
-                Continue to Zudoku
+                Continue to Sudoku
               </button>
             </motion.div>
           )}
