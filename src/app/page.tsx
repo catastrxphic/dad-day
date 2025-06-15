@@ -31,7 +31,7 @@ export default function WelcomePage() {
           transition={{ delay: 0.5, type: "spring" }}
           className="text-6xl font-bold text-white mb-4"
         >
-          Happy Father's Day Papi!
+          Happy Father&apos;s Day Papi!
         </motion.h1>
         <motion.div
           initial={{ opacity: 0 }}
